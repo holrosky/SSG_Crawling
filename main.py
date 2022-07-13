@@ -123,8 +123,22 @@ def download_excel():
     driver.switch_to.frame('iframe_5000001207_1')
 
 def is_there_order():
+    wait_until_clickable(20, "//button[@id='searchBtn']")
     click("//button[@id='searchBtn']")
-    time.sleep(1)
+
+    try:
+        WebDriverWait(driver, 2).until(EC.alert_is_present())
+
+        alert = driver.switch_to.alert
+        alert.accept()
+
+        log_in()
+        move_to_mobile_gift_order()
+        select_condition()
+
+        return False
+    except Exception as e:
+        pass
 
     num_of_order = len(driver.find_elements(By.CLASS_NAME, 'objbox')[1].find_elements(By.CLASS_NAME, "ev_dhx_skyblue")) + \
             len(driver.find_elements(By.CLASS_NAME, 'objbox')[1].find_elements(By.CLASS_NAME, "odd_dhx_skyblue"))
@@ -174,15 +188,22 @@ def move_to_mobile_gift_order():
 def log_in():
     print('Logging in...')
 
+    driver.get(url=URL)
+
+    try:
+        wait_until_clickable(20, "//input[@id='userId']")
+    except Exception as e:
+        return
+
+    time.sleep(1)
+
+    print(len(driver.window_handles))
     send_key("//input[@id='userId']", ssg_id)
     send_key("//input[@id='userPwd']", ssg_pwd + Keys.ENTER)
 
     while len(driver.window_handles) < 2:
         time.sleep(0.5)
     driver.switch_to.window(driver.window_handles[-1])
-
-
-
 
     wait_until_clickable(20, "//button[@class='pop_login_sendbtn']")
 
@@ -264,43 +285,52 @@ if __name__ == "__main__":
     chrome_options.add_experimental_option('prefs', profile)
 
     driver = webdriver.Chrome(executable_path='chromedriver', options=chrome_options)
-    driver.get(url=URL)
 
-    wait_until_clickable(20, "//input[@id='userId']")
-    time.sleep(1)
 
     log_in()
     move_to_mobile_gift_order()
     select_condition()
 
     while True:
-        if is_there_order():
-            download_excel()
-            item = parse_order_data()
+        try:
+            if is_there_order():
+                download_excel()
+                item = parse_order_data()
 
-            parse_data = dict()
+                parse_data = dict()
 
-            parse_data['secretkey'] = secrete_key
-            parse_data['item'] = item
+                parse_data['secretkey'] = secrete_key
+                parse_data['item'] = item
 
-            digest = hmac.new(encrypt_key.encode('utf-8'), str(parse_data).encode('utf-8'), hashlib.sha256).digest()
-            digest_b64 = base64.b64encode(digest)  # bytes again
-            Hmac = auth_key + ':' + digest_b64.decode('utf-8')
+                digest = hmac.new(encrypt_key.encode('utf-8'), str(parse_data).encode('utf-8'), hashlib.sha256).digest()
+                digest_b64 = base64.b64encode(digest)  # bytes again
+                Hmac = auth_key + ':' + digest_b64.decode('utf-8')
 
-            header = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Authorization': auth_key,
-                'Hmac': Hmac
-            }
+                header = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': auth_key,
+                    'Hmac': Hmac
+                }
 
-            post_result = requests.post(url=post_api_url, headers=header, data=json.dumps(parse_data))
-            reply = post_result.json()
-            print(Hmac)
-            print(post_result.json())
+                response = requests.post(url=post_api_url, headers=header, data=json.dumps(parse_data))
+                reply = response.json()
 
-            if reply['msg'] == '성공':
-                mark_as_delivery_completed()
-                select_condition()
-        else:
-            time.sleep(1)
+                print(response)
+                print(response.json())
+
+                if reply['msg'] == '성공':
+                    mark_as_delivery_completed()
+                    select_condition()
+        except Exception as e:
+            print('error! resetting...')
+            while len(driver.window_handles) >= 2:
+                driver.switch_to.window(driver.window_handles[-1])
+                driver.close()
+                time.sleep(0.5)
+
+            driver.switch_to.window(driver.window_handles[-1])
+
+            log_in()
+            move_to_mobile_gift_order()
+            select_condition()
