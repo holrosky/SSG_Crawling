@@ -323,14 +323,18 @@ if __name__ == "__main__":
                     mark_as_delivery_completed()
                     select_condition()
         except Exception as e:
-            print('error! resetting...')
-            while len(driver.window_handles) >= 2:
-                driver.switch_to.window(driver.window_handles[-1])
-                driver.close()
-                time.sleep(0.5)
+            try:
+                while True:
+                    time.sleep(5)
+                    for handle in driver.window_handles:
+                        driver.switch_to.window(handle)
+                        driver.close()
 
-            driver.switch_to.window(driver.window_handles[-1])
+                    driver = webdriver.Chrome(executable_path='chromedriver', options=chrome_options)
 
-            log_in()
-            move_to_mobile_gift_order()
-            select_condition()
+                    log_in()
+                    move_to_mobile_gift_order()
+                    select_condition()
+                    break
+            except Exception as e:
+                pass
